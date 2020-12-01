@@ -632,10 +632,6 @@ class Client:
                         self.get_new_proxy()
                         client_connect_errors = 0
 
-                if isinstance(exc, (aiohttp.ServerDisconnectedError, aiohttp.ClientResponseError, ConnectionResetError)):
-                    log.error(f"[{self.http.token}] Recreating session...")
-                    self.http.recreate()
-
                 retry = backoff.delay()
                 log.exception("Attempting a reconnect in %.2fs", retry)
                 await asyncio.sleep(retry)
