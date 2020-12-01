@@ -408,10 +408,10 @@ class DiscordWebSocket:
                     'activities': [],
                     'afk': False
                 },
-                'compress': True,
-                'large_threshold': 250,
-                'guild_subscriptions': self._connection.guild_subscriptions,
-                'v': 3,
+                'compress': False,
+                # 'large_threshold': 250,
+                # 'guild_subscriptions': self._connection.guild_subscriptions,
+                # 'v': 3,
                 'client_state': {
                     'guild_hashes': {},
                     'highest_last_message_id': '0',
