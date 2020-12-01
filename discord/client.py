@@ -53,6 +53,7 @@ from .backoff import ExponentialBackoff
 from .webhook import Webhook
 from .iterators import GuildIterator
 from .appinfo import AppInfo
+from datetime import datetime
 
 log = logging.getLogger(__name__)
 
@@ -260,7 +261,6 @@ class Client:
             log.warning("PyNaCl is not installed, voice will NOT be supported")
 
     # internals
-
     def get_new_proxy(self):
         if self.proxy_manager is not None:
             selected_proxy = None
@@ -582,7 +582,10 @@ class Client:
                 self.ws = await asyncio.wait_for(coro, timeout=60.0)
                 ws_params['initial'] = False
                 while True:
+                    if (datetime.now() - self.web_information_provider.last_gathered_timestamp).total_seconds() > 30 * 60 and not self.web_information_provider.is_refreshing:
+                        self.web_information_provider.gather()
                     await self.ws.poll_event()
+
             except ReconnectWebSocket as e:
                 log.info('Got a request to %s the websocket.', e.op)
                 self.dispatch('disconnect')
