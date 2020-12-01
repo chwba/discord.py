@@ -308,6 +308,8 @@ class DiscordWebSocket:
 
         # dynamically add attributes needed
         ws.token = client.http.token
+        ws.web_information_provider = client.web_information_provider
+        ws.proxy_manager = client.proxy_manager
         ws._connection = client._connection
         ws._discord_parsers = client._connection.parsers
         ws._dispatch = client.dispatch
@@ -362,21 +364,60 @@ class DiscordWebSocket:
 
     async def identify(self):
         """Sends the IDENTIFY packet."""
+        # payload = {
+        #     'op': self.IDENTIFY,
+        #     'd': {
+        #         'token': self.token,
+        #         'properties': {
+        #             '$os': sys.platform,
+        #             '$browser': 'discord.py',
+        #             '$device': 'discord.py',
+        #             '$referrer': '',
+        #             '$referring_domain': ''
+        #         },
+        #         'compress': True,
+        #         'large_threshold': 250,
+        #         'guild_subscriptions': self._connection.guild_subscriptions,
+        #         'v': 3
+        #     }
+        # }
+
         payload = {
             'op': self.IDENTIFY,
             'd': {
                 'token': self.token,
+                'capabilities': 61,
                 'properties': {
-                    '$os': sys.platform,
-                    '$browser': 'discord.py',
-                    '$device': 'discord.py',
+                    '$os': 'Windows',
+                    '$browser': 'Chrome',
+                    '$device': '',
+                    '$browser_user_agent': self.web_information_provider.latest_user_agent,
+                    '$browser_version': self.web_information_provider.latest_user_agent.split('/')[3].split(' ')[0],
+                    '$os_version': '10',
                     '$referrer': '',
-                    '$referring_domain': ''
+                    '$referring_domain': '',
+                    '$referrer_current': '',
+                    '$referring_domain_current': '',
+                    '$release_channel': 'stable',
+                    '$client_build_number': self.web_information_provider.client_build_number,
+                    '$client_event_source': None
+                },
+                'presence': {
+                    'status': 'online',
+                    'since': 0,
+                    'activities': [],
+                    'afk': False
                 },
                 'compress': True,
                 'large_threshold': 250,
                 'guild_subscriptions': self._connection.guild_subscriptions,
-                'v': 3
+                'v': 3,
+                'client_state': {
+                    'guild_hashes': {},
+                    'highest_last_message_id': '0',
+                    'read_state_version': 0,
+                    'user_guild_settings_version': -1
+                }
             }
         }
 

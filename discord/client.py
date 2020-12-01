@@ -230,12 +230,15 @@ class Client:
         self._listeners = {}
         self.shard_id = options.get('shard_id')
         self.shard_count = options.get('shard_count')
+        self.proxy_manager = options.get('proxy_manager')
+        self.web_information_provider = options.get('web_information_provider')
 
         connector = options.pop('connector', None)
         proxy = options.pop('proxy', None)
         proxy_auth = options.pop('proxy_auth', None)
         unsync_clock = options.pop('assume_unsync_clock', True)
         self.http = HTTPClient(connector, proxy=proxy, proxy_auth=proxy_auth, unsync_clock=unsync_clock, loop=self.loop)
+        self.http.user_agent = self.web_information_provider.latest_user_agent
 
         self._handlers = {
             'ready': self._handle_ready
@@ -257,6 +260,26 @@ class Client:
             log.warning("PyNaCl is not installed, voice will NOT be supported")
 
     # internals
+
+    def get_new_proxy(self):
+        if self.proxy_manager is not None:
+            selected_proxy = None
+            proxy_auth = None
+
+            if self.http.proxy:
+                selected_proxy = self.http.proxy.replace("http://", "")
+
+            proxy_dict, selected_proxy = self.proxy_manager.get_random_proxy(selected_proxy)
+
+            if not self.proxy_manager.no_auth:
+                proxy_ip = selected_proxy.split("@")[1].split(":")[0]
+                proxy_port = selected_proxy.split("@")[1].split(":")[1]
+                proxy_dict['http'] = f"http://{proxy_ip}:{proxy_port}"
+                proxy_username, proxy_password = self.proxy_manager.select_proxy_credentials()
+                proxy_auth = aiohttp.BasicAuth(login=proxy_username, password=proxy_password)
+
+            self.http.proxy_auth = proxy_auth
+            self.http.proxy = proxy_dict['http']
 
     def _get_websocket(self, guild_id=None, *, shard_id=None):
         return self.ws
@@ -552,6 +575,7 @@ class Client:
             'initial': True,
             'shard_id': self.shard_id,
         }
+        client_connect_errors = 0
         while not self.is_closed():
             try:
                 coro = DiscordWebSocket.from_client(self, **ws_params)
@@ -597,6 +621,17 @@ class Client:
                     if exc.code != 1000:
                         await self.close()
                         raise
+
+                if isinstance(exc, (aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError)):
+                    client_connect_errors += 1
+                    if client_connect_errors >= 3:
+                        log.error(f"[{self.http.token}] Getting a new proxy...")
+                        self.get_new_proxy()
+                        client_connect_errors = 0
+
+                if isinstance(exc, (aiohttp.ServerDisconnectedError, aiohttp.ClientResponseError, ConnectionResetError)):
+                    log.error(f"[{self.http.token}] Recreating session...")
+                    self.http.recreate()
 
                 retry = backoff.delay()
                 log.exception("Attempting a reconnect in %.2fs", retry)
