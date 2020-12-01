@@ -619,7 +619,7 @@ class Client:
 
                 # If we get connection reset by peer then try to RESUME
                 if isinstance(exc, OSError) and exc.errno in (54, 10054):
-                    ws_params.update(sequence=self.ws.sequence, initial=False, resume=True, session=self.ws.session_id)
+                    ws_params.update(sequence=self.ws.sequence if self.ws is not None else None, resume=True, session=self.ws.session_id if self.ws is not None else None)
                     continue
 
                 # We should only get this when an unhandled close code happens,
