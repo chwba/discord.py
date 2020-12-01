@@ -529,7 +529,15 @@ class Client:
         """
 
         log.info('logging in using static token')
-        await self.http.static_login(token.strip(), bot=bot)
+        tries = 0
+        while tries < 5:
+            try:
+                await self.http.static_login(token.strip(), bot=bot)
+                break
+            except Exception as exception:
+                tries += 1
+                if isinstance(exception, (aiohttp.ServerDisconnectedError, aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError)):
+                    self.get_new_proxy()
         self._connection.is_bot = bot
 
     async def logout(self):
@@ -638,7 +646,7 @@ class Client:
                 # Always try to RESUME the connection
                 # If the connection is not RESUME-able then the gateway will invalidate the session.
                 # This is apparently what the official Discord client does.
-                ws_params.update(sequence=self.ws.sequence, resume=True, session=self.ws.session_id)
+                ws_params.update(sequence=self.ws.sequence if self.ws is not None else None, resume=True, session=self.ws.session_id if self.ws is not None else None)
 
     async def close(self):
         """|coro|
@@ -739,6 +747,7 @@ class Client:
         future = asyncio.ensure_future(runner(), loop=loop)
         future.add_done_callback(stop_loop_on_completion)
         try:
+            print("run loop")
             loop.run_forever()
         except KeyboardInterrupt:
             log.info('Received signal to terminate bot and event loop.')

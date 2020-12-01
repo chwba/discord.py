@@ -381,12 +381,10 @@ class DiscordWebSocket:
         #         'v': 3
         #     }
         # }
-
         payload = {
             'op': self.IDENTIFY,
             'd': {
                 'token': self.token,
-                'capabilities': 61,
                 'properties': {
                     '$os': 'Windows',
                     '$browser': 'Chrome',
@@ -402,22 +400,10 @@ class DiscordWebSocket:
                     '$client_build_number': self.web_information_provider.client_build_number,
                     '$client_event_source': None
                 },
-                'presence': {
-                    'status': 'online',
-                    'since': 0,
-                    'activities': [],
-                    'afk': False
-                },
-                'compress': False,
-                # 'large_threshold': 250,
-                # 'guild_subscriptions': self._connection.guild_subscriptions,
-                # 'v': 3,
-                'client_state': {
-                    'guild_hashes': {},
-                    'highest_last_message_id': '0',
-                    'read_state_version': 0,
-                    'user_guild_settings_version': -1
-                }
+                'compress': True,
+                'large_threshold': 250,
+                'guild_subscriptions': self._connection.guild_subscriptions,
+                'v': 3
             }
         }
 
