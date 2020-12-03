@@ -534,8 +534,9 @@ class Client:
 
         log.info('logging in using static token')
         tries = 0
+        connection_attempts = 0
         backoff = ExponentialBackoff()
-        while tries < 3:
+        while tries < 6:
             try:
                 await self.http.static_login(token.strip(), bot=bot)
                 break
@@ -545,7 +546,7 @@ class Client:
                 log.error(f"[STATIC_LOGIN] Got an error during static login, sleeping {round(sleep_time, 2)} seconds")
                 await asyncio.sleep(sleep_time)
 
-                if isinstance(exception, (aiohttp.ServerDisconnectedError, aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError)):
+                if isinstance(exception, (aiohttp.ServerDisconnectedError, aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError, aiohttp.ServerDisconnectedError)):
                     if self.http.proxy not in self.n_proxy_errors_on_single_proxy_dict.keys():
                         self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] = 1
                     else:
@@ -557,9 +558,12 @@ class Client:
                         else:
                             self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] += 1
 
-                    log.error(f"[{self.http.token}][STATIC_LOGIN] Getting a new proxy... Old proxy: {self.http.proxy}")
-                    self.get_new_proxy()
-                    log.error(f"[{self.http.token}][STATIC_LOGIN] ... New proxy: {self.http.proxy}")
+                    connection_attempts += 1
+                    if connection_attempts > 2:
+                        log.error(f"[{self.http.token}][STATIC_LOGIN] Getting a new proxy... Old proxy: {self.http.proxy}")
+                        self.get_new_proxy()
+                        log.error(f"[{self.http.token}][STATIC_LOGIN] ... New proxy: {self.http.proxy}")
+                        connection_attempts = 0
 
                 else:
                     raise exception
@@ -659,9 +663,9 @@ class Client:
                         await self.close()
                         raise
 
-                if isinstance(exc, (aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError)):
+                if isinstance(exc, (aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError, aiohttp.ServerDisconnectedError)):
                     client_connect_errors += 1
-                    if client_connect_errors >= 3:
+                    if client_connect_errors > 2:
                         if self.http.proxy not in self.n_proxy_errors_on_single_proxy_dict.keys():
                             self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] = 1
                         else:
@@ -679,10 +683,10 @@ class Client:
                         client_connect_errors = 0
 
                 retry = backoff.delay()
-                if not isinstance(exc, (aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError)):
-                    log.exception("Attempting a reconnect in %.2fs", retry)
+                if not isinstance(exc, (aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError, aiohttp.ServerDisconnectedError)):
+                    log.exception(f"Attempting a reconnect in %.2fs", retry)
                 else:
-                    log.error("Attempting a reconnect in %.2fs", retry)
+                    log.error(f"[{exc.__class__.__name__}] ({exc}) Attempting a reconnect in %.2fs", retry)
 
                 await asyncio.sleep(retry)
                 # Always try to RESUME the connection
