@@ -255,6 +255,7 @@ class Client:
         self._ready = asyncio.Event()
         self._connection._get_websocket = self._get_websocket
         self._connection._get_client = lambda: self
+        self.n_proxy_errors_on_single_proxy_dict = dict()
 
         if VoiceClient.warn_nacl:
             VoiceClient.warn_nacl = False
@@ -277,6 +278,9 @@ class Client:
                 proxy_dict['http'] = f"http://{proxy_ip}:{proxy_port}"
                 proxy_username, proxy_password = self.proxy_manager.select_proxy_credentials()
                 proxy_auth = aiohttp.BasicAuth(login=proxy_username, password=proxy_password)
+
+            if proxy_auth is None:
+                log.warning("Proxy auth was None!")
 
             self.http.proxy_auth = proxy_auth
             self.http.proxy = proxy_dict['http']
@@ -530,15 +534,33 @@ class Client:
 
         log.info('logging in using static token')
         tries = 0
+        backoff = ExponentialBackoff()
         while tries < 3:
             try:
                 await self.http.static_login(token.strip(), bot=bot)
                 break
             except Exception as exception:
                 tries += 1
-                await asyncio.sleep(1)
+                sleep_time = backoff.delay()
+                log.error(f"[STATIC_LOGIN] Got an error during static login, sleeping {round(sleep_time, 2)} seconds")
+                await asyncio.sleep(sleep_time)
+
                 if isinstance(exception, (aiohttp.ServerDisconnectedError, aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError)):
+                    if self.http.proxy not in self.n_proxy_errors_on_single_proxy_dict.keys():
+                        self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] = 1
+                    else:
+                        if self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] > 6:
+                            log.error("[STATIC_LOGIN] Exceeded healthy connection failures on single proxy, exiting.")
+                            self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] = 0
+                            await self.logout()
+                            break
+                        else:
+                            self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] += 1
+
+                    log.error(f"[{self.http.token}][STATIC_LOGIN] Getting a new proxy... Old proxy: {self.http.proxy}")
                     self.get_new_proxy()
+                    log.error(f"[{self.http.token}][STATIC_LOGIN] ... New proxy: {self.http.proxy}")
+
                 else:
                     raise exception
 
@@ -640,12 +662,28 @@ class Client:
                 if isinstance(exc, (aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError)):
                     client_connect_errors += 1
                     if client_connect_errors >= 3:
-                        log.error(f"[{self.http.token}] Getting a new proxy...")
+                        if self.http.proxy not in self.n_proxy_errors_on_single_proxy_dict.keys():
+                            self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] = 1
+                        else:
+                            if self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] > 6:
+                                log.error("[GATEWAY] Exceeded healthy connection failures on single proxy, exiting.")
+                                self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] = 0
+                                await self.logout()
+                                break
+                            else:
+                                self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] += 1
+
+                        log.error(f"[{self.http.token}][GATEWAY] Getting a new proxy... Old proxy: {self.http.proxy}")
                         self.get_new_proxy()
+                        log.error(f"[{self.http.token}][GATEWAY] ....New proxy: {self.http.proxy}")
                         client_connect_errors = 0
 
                 retry = backoff.delay()
-                log.exception("Attempting a reconnect in %.2fs", retry)
+                if not isinstance(exc, (aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError)):
+                    log.exception("Attempting a reconnect in %.2fs", retry)
+                else:
+                    log.error("Attempting a reconnect in %.2fs", retry)
+
                 await asyncio.sleep(retry)
                 # Always try to RESUME the connection
                 # If the connection is not RESUME-able then the gateway will invalidate the session.
