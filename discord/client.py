@@ -530,14 +530,18 @@ class Client:
 
         log.info('logging in using static token')
         tries = 0
-        while tries < 5:
+        while tries < 3:
             try:
                 await self.http.static_login(token.strip(), bot=bot)
                 break
             except Exception as exception:
                 tries += 1
+                await asyncio.sleep(1)
                 if isinstance(exception, (aiohttp.ServerDisconnectedError, aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError)):
                     self.get_new_proxy()
+                else:
+                    raise exception
+
         self._connection.is_bot = bot
 
     async def logout(self):

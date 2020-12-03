@@ -295,7 +295,7 @@ class HTTPClient:
         except HTTPException as exc:
             self._token(old_token, bot=old_bot)
             if exc.response.status == 401:
-                raise LoginFailure('Improper token has been passed.') from exc
+                raise LoginFailure('[ACCOUNT_DISABLED] Improper token has been passed.') from exc
             raise
 
         return data
