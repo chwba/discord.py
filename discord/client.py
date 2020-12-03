@@ -544,9 +544,8 @@ class Client:
             except Exception as exception:
                 tries += 1
                 sleep_time = backoff.delay()
-                log.error(f"[STATIC_LOGIN] Got an error during static login, sleeping {round(sleep_time, 2)} seconds")
 
-                if isinstance(exception, (aiohttp.ServerDisconnectedError, aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError, aiohttp.ServerDisconnectedError)):
+                if isinstance(exception, (aiohttp.ServerDisconnectedError, aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError, aiohttp.ServerDisconnectedError)) or connection_attempts > 2:
                     if self.http.proxy not in self.n_proxy_errors_on_single_proxy_dict.keys():
                         self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] = 1
                     else:
@@ -566,12 +565,14 @@ class Client:
                         connection_attempts = 0
 
                 elif isinstance(exception, aiohttp.ClientOSError) and ('32' in str(exception) or "broken pipe" in str(exception).lower()):
+                    connection_attempts += 1
                     sleep_time = sleep_time + uniform(5, 10)
                     log.error(f"[STATIC_LOGIN][{exception.__class__.__name__}] ({exception}) Attempting a reconnect in %.2fs", sleep_time)
 
                 else:
                     raise exception
 
+                log.error(f"[STATIC_LOGIN] Got an error during static login, sleeping {round(sleep_time, 2)} seconds")
                 await asyncio.sleep(sleep_time)
 
         self._connection.is_bot = bot
@@ -669,7 +670,7 @@ class Client:
                         await self.close()
                         raise
 
-                if isinstance(exc, (aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError, aiohttp.ServerDisconnectedError)):
+                if isinstance(exc, (aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError, aiohttp.ServerDisconnectedError)) or client_connect_errors > 2:
                     client_connect_errors += 1
                     if client_connect_errors > 2:
                         if self.http.proxy not in self.n_proxy_errors_on_single_proxy_dict.keys():
@@ -689,12 +690,13 @@ class Client:
                         client_connect_errors = 0
 
                 retry = backoff.delay()
-                if not isinstance(exc, (aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError, aiohttp.ServerDisconnectedError)):
+                if not isinstance(exc, (aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError, aiohttp.ServerDisconnectedError)) and not isinstance(exc, aiohttp.ClientOSError) and ('32' in str(exc) or "broken pipe" in str(exc).lower()):
                     log.exception(f"Attempting a reconnect in %.2fs", retry)
                 else:
                     log.error(f"[GATEWAY][{exc.__class__.__name__}] ({exc}) Attempting a reconnect in %.2fs", retry)
 
                 if isinstance(exc, aiohttp.ClientOSError) and ('32' in str(exc) or "broken pipe" in str(exc).lower()):
+                    client_connect_errors += 1
                     retry = retry + uniform(5, 10)
                     log.error(f"[GATEWAY][{exc.__class__.__name__}] ({exc}) Attempting a reconnect in %.2fs", retry)
 
