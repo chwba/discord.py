@@ -263,15 +263,18 @@ class Client:
             log.warning("PyNaCl is not installed, voice will NOT be supported")
 
     # internals
-    def get_new_proxy(self):
+    def get_new_proxy(self, refresh_list: bool = False):
         if self.proxy_manager is not None:
             selected_proxy = None
             proxy_auth = None
 
+            if refresh_list and 'online' in self.proxy_manager.proxy_type:
+                self.proxy_manager.get_online_proxy_list()
+
             if self.http.proxy:
                 selected_proxy = self.http.proxy.replace("http://", "")
 
-            proxy_dict, selected_proxy = self.proxy_manager.get_random_proxy(selected_proxy)
+            proxy_dict, selected_proxy = self.proxy_manager.get_random_proxy(previous_proxy=selected_proxy, from_online=True if 'online' in self.proxy_manager.proxy_type else False)
 
             if not self.proxy_manager.no_auth:
                 proxy_ip = selected_proxy.split("@")[1].split(":")[0]
@@ -546,16 +549,25 @@ class Client:
                 sleep_time = backoff.delay()
 
                 if isinstance(exception, (aiohttp.ServerDisconnectedError, aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError, aiohttp.ServerDisconnectedError)) or connection_attempts > 2:
+
                     if self.http.proxy not in self.n_proxy_errors_on_single_proxy_dict.keys():
                         self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] = 1
                     else:
                         if self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] > 6:
+                            self.proxy_manager.free_proxy(self.http.proxy.replace("http://", ""))
                             log.error("[STATIC_LOGIN] Exceeded healthy connection failures on single proxy, exiting.")
                             self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] = 0
                             await self.logout()
                             break
                         else:
                             self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] += 1
+
+                    if '407' in str(exception) or 'proxy authentication required' in str(exception).lower():
+                        log.error("Got 407 auth required, refreshing proxy-list.")
+                        log.error(f"[STATIC_LOGIN] Getting a new proxy... Old proxy: {self.http.proxy}")
+                        self.get_new_proxy(refresh_list=True)
+                        log.error(f"[STATIC_LOGIN] ... New proxy: {self.http.proxy}")
+                        connection_attempts = 0
 
                     connection_attempts += 1
                     if connection_attempts > 2:
@@ -627,8 +639,12 @@ class Client:
                 self.ws = await asyncio.wait_for(coro, timeout=60.0)
                 ws_params['initial'] = False
                 while True:
+
                     if (datetime.now() - self.web_information_provider.last_gathered_timestamp).total_seconds() > 30 * 60 and not self.web_information_provider.is_refreshing:
                         self.web_information_provider.gather()
+                    if 'online' in self.proxy_manager.proxy_type and (datetime.now() - self.proxy_manager.last_update).total_seconds() > (30 * 60):
+                        self.proxy_manager.get_online_proxy_list()
+
                     await self.ws.poll_event()
 
             except ReconnectWebSocket as e:
@@ -672,11 +688,20 @@ class Client:
 
                 if isinstance(exc, (aiohttp.ClientConnectorError, aiohttp.ClientHttpProxyError, aiohttp.ServerDisconnectedError)) or client_connect_errors > 2:
                     client_connect_errors += 1
+
+                    if '407' in str(exc) or 'proxy authentication required' in str(exc).lower():
+                        log.error("Got 407 auth required, refreshing proxy-list.")
+                        log.error(f"[GATEWAY] Getting a new proxy... Old proxy: {self.http.proxy}")
+                        self.get_new_proxy(refresh_list=True)
+                        log.error(f"[GATEWAY] ... New proxy: {self.http.proxy}")
+                        client_connect_errors = 0
+
                     if client_connect_errors > 2:
                         if self.http.proxy not in self.n_proxy_errors_on_single_proxy_dict.keys():
                             self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] = 1
                         else:
                             if self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] > 6:
+                                self.proxy_manager.free_proxy(self.http.proxy.replace("http://", ""))
                                 log.error("[GATEWAY] Exceeded healthy connection failures on single proxy, exiting.")
                                 self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] = 0
                                 await self.logout()
@@ -705,6 +730,8 @@ class Client:
                 # If the connection is not RESUME-able then the gateway will invalidate the session.
                 # This is apparently what the official Discord client does.
                 ws_params.update(sequence=self.ws.sequence if self.ws is not None else None, resume=True, session=self.ws.session_id if self.ws is not None else None)
+
+        self.proxy_manager.free_proxy(self.http.proxy.replace("http://", ""))
 
     async def close(self):
         """|coro|
