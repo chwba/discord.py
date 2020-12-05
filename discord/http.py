@@ -117,6 +117,18 @@ class HTTPClient:
             self.__session = aiohttp.ClientSession(connector=self.connector, ws_response_class=DiscordClientWebSocketResponse)
 
     async def ws_connect(self, url, *, compress=0):
+        # Original
+        # kwargs = {
+        #     'proxy_auth': self.proxy_auth,
+        #     'proxy': self.proxy,
+        #     'max_msg_size': 0,
+        #     'timeout': 30.0,
+        #     'autoclose': False,
+        #     'headers': {
+        #         'User-Agent': self.user_agent,
+        #     },
+        #     'compress': compress
+        # }
         kwargs = {
             'proxy_auth': self.proxy_auth,
             'proxy': self.proxy,
@@ -124,9 +136,18 @@ class HTTPClient:
             'timeout': 30.0,
             'autoclose': False,
             'headers': {
+                'Host': 'gateway.discord.gg',
+                'Connection': 'Upgrade',
+                'Pragma': 'no-cache',
+                'Cache-Control': 'no-cache',
                 'User-Agent': self.user_agent,
-            },
-            'compress': compress
+                'Upgrade': 'websocket',
+                'Sec-WebSocket-Version': '13',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Language': 'en-US',
+                'Sec-WebSocket-Extensions': 'permessage-deflate; client_max_window_bits'
+            }
+            # 'compress': compress
         }
 
         return await self.__session.ws_connect(url, **kwargs)
