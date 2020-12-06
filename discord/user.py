@@ -102,10 +102,12 @@ class BaseUser(_BaseUser):
         return self.id >> 22
 
     def _update(self, data):
-        self.name = data['username']
-        self.id = int(data['id'])
-        self.discriminator = data['discriminator']
-        self.avatar = data['avatar']
+        if data is None:
+            data = dict()
+        self.name = data.get('username')
+        self.id = int(data.get('id', 0))
+        self.discriminator = data.get('discriminator')
+        self.avatar = data.get('avatar')
         self._public_flags = data.get('public_flags', 0)
         self.bot = data.get('bot', False)
         self.system = data.get('system', False)

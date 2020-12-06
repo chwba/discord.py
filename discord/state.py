@@ -345,7 +345,7 @@ class ConnectionState:
             if isinstance(to_remove, DMChannel):
                 self._private_channels_by_user.pop(to_remove.recipient.id, None)
 
-        if isinstance(channel, DMChannel):
+        if isinstance(channel, DMChannel) and channel and hasattr(channel, 'recipient') and hasattr(channel.recipient, "id"):
             self._private_channels_by_user[channel.recipient.id] = channel
 
     def add_dm_channel(self, data):

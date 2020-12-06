@@ -44,8 +44,8 @@ class Relationship:
 
     def __init__(self, *, state, data):
         self._state = state
-        self.type = try_enum(RelationshipType, data['type'])
-        self.user = state.store_user(data['user'])
+        self.type = try_enum(RelationshipType, data.get('type'))
+        self.user = state.store_user(data.get('user'))
 
     def __repr__(self):
         return '<Relationship user={0.user!r} type={0.type!r}>'.format(self)

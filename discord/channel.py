@@ -1020,9 +1020,13 @@ class DMChannel(discord.abc.Messageable, Hashable):
 
     def __init__(self, *, me, state, data):
         self._state = state
-        self.recipient = state.store_user(data['recipients'][0])
+        recipients = data.get('recipients', [])
+        if recipients:
+            self.recipient = state.store_user(recipients[0])
+        else:
+            self.recipient = ""
         self.me = me
-        self.id = int(data['id'])
+        self.id = int(data.get('id', 0))
 
     async def _get_channel(self):
         return self
