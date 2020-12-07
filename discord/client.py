@@ -252,7 +252,6 @@ class Client:
         self.shard_count = options.get('shard_count')
         self.proxy_manager = options.get('proxy_manager')
         self.web_information_provider = options.get('web_information_provider')
-        self.have_patched_aiohttp = False
 
         connector = options.pop('connector', None)
         proxy = options.pop('proxy', None)

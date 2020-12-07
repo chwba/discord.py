@@ -40,6 +40,7 @@ import aiohttp
 
 from . import utils
 from .activity import BaseActivity
+from .backoff import ExponentialBackoff
 from .enums import SpeakingState
 from .errors import ConnectionClosed, InvalidArgument
 
@@ -308,7 +309,6 @@ class DiscordWebSocket:
 
         # dynamically add attributes needed
         ws.token = client.http.token
-        ws.have_patched_aiohttp = client.have_patched_aiohttp
         ws.web_information_provider = client.web_information_provider
         ws.proxy_manager = client.proxy_manager
         ws._connection = client._connection
@@ -655,16 +655,21 @@ class DiscordWebSocket:
     async def send(self, data):
         await self._rate_limiter.block()
         self._dispatch('socket_raw_send', data)
-        try:
-            await self.socket.send_str(data)
-        except Exception as exc:
-            log.warning(f"[GATEWAY][SEND] {exc.__class__.__name__} {exc}")
-            if 'ConnectionResetError' in str(exc):
-                if not self.have_patched_aiohttp:
-                    from .client import patch_streamwriter, _write_no_exception
-                    patch_streamwriter(web_prot=True)
-            else:
-                raise exc
+        tries = 0
+        backoff = ExponentialBackoff()
+        while True:
+            try:
+                await self.socket.send_str(data)
+                break
+            except Exception as exc:
+                tries += 1
+                if 'connectionreseterror' == str(exc.__class__.__name__).lower() and tries < 3:
+                    sleep_time = backoff.delay()
+                    log.warning(f"[GATEWAY][SEND] {exc.__class__.__name__} {exc} Sleeping {round(sleep_time, 2)} seconds...")
+                    await asyncio.sleep(sleep_time)
+                    continue
+                else:
+                    raise exc
 
     async def send_as_json(self, data):
         try:
