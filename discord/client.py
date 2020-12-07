@@ -64,7 +64,7 @@ def _write_no_exception(self, chunk: bytes) -> None:
     except ConnectionResetError as exc:
         log.warning('ConnectionResetError exception suppressed')
 
-def patch_streamwriter(web_prot):
+def patch_streamwriter(web_prot=False):
     if not web_prot:
         aiohttp.http_writer.StreamWriter.original_write = aiohttp.http_writer.StreamWriter._write
         aiohttp.http_writer.StreamWriter._write = _write_no_exception
