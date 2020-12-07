@@ -308,6 +308,7 @@ class DiscordWebSocket:
 
         # dynamically add attributes needed
         ws.token = client.http.token
+        ws.have_patched_aiohttp = client.have_patched_aiohttp
         ws.web_information_provider = client.web_information_provider
         ws.proxy_manager = client.proxy_manager
         ws._connection = client._connection
@@ -654,7 +655,16 @@ class DiscordWebSocket:
     async def send(self, data):
         await self._rate_limiter.block()
         self._dispatch('socket_raw_send', data)
-        await self.socket.send_str(data)
+        try:
+            await self.socket.send_str(data)
+        except Exception as exc:
+            log.warning(f"[GATEWAY][SEND] {exc.__class__.__name__} {exc}")
+            if 'ConnectionResetError' in str(exc):
+                if not self.have_patched_aiohttp:
+                    from .client import patch_streamwriter, _write_no_exception
+                    patch_streamwriter(web_prot=True)
+            else:
+                raise exc
 
     async def send_as_json(self, data):
         try:

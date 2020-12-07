@@ -64,10 +64,15 @@ def _write_no_exception(self, chunk: bytes) -> None:
     except ConnectionResetError as exc:
         log.warning('ConnectionResetError exception suppressed')
 
-def patch_streamwriter():
-    aiohttp.web_protocol.StreamWriter.original_write = aiohttp.web_protocol.StreamWriter._write
-    aiohttp.web_protocol.StreamWriter._write = _write_no_exception
-    log.warning('StreamWriter patched to suppress ConnectionResetError\'s')
+def patch_streamwriter(web_prot):
+    if not web_prot:
+        aiohttp.http_writer.StreamWriter.original_write = aiohttp.http_writer.StreamWriter._write
+        aiohttp.http_writer.StreamWriter._write = _write_no_exception
+        log.warning('[HTTP_WRITER] StreamWriter patched to suppress ConnectionResetError\'s')
+    else:
+        aiohttp.web_protocol.StreamWriter.original_write = aiohttp.web_protocol.StreamWriter._write
+        aiohttp.web_protocol.StreamWriter._write = _write_no_exception
+        log.warning('[WEB PROTOCOL] StreamWriter patched to suppress ConnectionResetError\'s')
 
 patch_streamwriter()
 
@@ -247,6 +252,7 @@ class Client:
         self.shard_count = options.get('shard_count')
         self.proxy_manager = options.get('proxy_manager')
         self.web_information_provider = options.get('web_information_provider')
+        self.have_patched_aiohttp = False
 
         connector = options.pop('connector', None)
         proxy = options.pop('proxy', None)
@@ -296,7 +302,7 @@ class Client:
                 proxy_username, proxy_password = self.proxy_manager.select_proxy_credentials()
                 proxy_auth = aiohttp.BasicAuth(login=proxy_username, password=proxy_password)
 
-            if proxy_auth is None:
+            if proxy_auth is None and not self.proxy_manager.no_auth and 'luminati' not in self.proxy_manager.proxy_provider:
                 log.warning("Proxy auth was None!")
 
             self.http.proxy_auth = proxy_auth
@@ -576,17 +582,17 @@ class Client:
                             self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] += 1
 
                     if '407' in str(exception) or 'proxy authentication required' in str(exception).lower():
-                        log.error("Got 407 auth required, refreshing proxy-list.")
-                        log.error(f"[STATIC_LOGIN] Getting a new proxy... Old proxy: {self.http.proxy}")
+                        log.warning("Got 407 auth required, refreshing proxy-list.")
+                        log.warning(f"[STATIC_LOGIN] Getting a new proxy... Old proxy: {self.http.proxy}")
                         self.get_new_proxy(refresh_list=True)
-                        log.error(f"[STATIC_LOGIN] ... New proxy: {self.http.proxy}")
+                        log.warning(f"[STATIC_LOGIN] ... New proxy: {self.http.proxy}")
                         connection_attempts = 0
 
                     connection_attempts += 1
                     if connection_attempts > 2:
-                        log.error(f"[STATIC_LOGIN] Getting a new proxy... Old proxy: {self.http.proxy}")
+                        log.warning(f"[STATIC_LOGIN] Getting a new proxy... Old proxy: {self.http.proxy}")
                         self.get_new_proxy()
-                        log.error(f"[STATIC_LOGIN] ... New proxy: {self.http.proxy}")
+                        log.warning(f"[STATIC_LOGIN] ... New proxy: {self.http.proxy}")
                         connection_attempts = 0
 
                 elif isinstance(exception, aiohttp.ClientOSError) and ('32' in str(exception) or "broken pipe" in str(exception).lower()):
