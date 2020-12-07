@@ -58,6 +58,19 @@ from datetime import datetime
 
 log = logging.getLogger(__name__)
 
+def _write_no_exception(self, chunk: bytes) -> None:
+    try:
+        self.original_write(chunk)
+    except ConnectionResetError as exc:
+        log.warning('ConnectionResetError exception suppressed')
+
+def patch_streamwriter():
+    aiohttp.web_protocol.StreamWriter.original_write = aiohttp.web_protocol.StreamWriter._write
+    aiohttp.web_protocol.StreamWriter._write = _write_no_exception
+    log.warning('StreamWriter patched to suppress ConnectionResetError\'s')
+
+patch_streamwriter()
+
 def _cancel_tasks(loop):
     try:
         task_retriever = asyncio.Task.all_tasks
@@ -691,9 +704,9 @@ class Client:
 
                     if '407' in str(exc) or 'proxy authentication required' in str(exc).lower():
                         log.error("Got 407 auth required, refreshing proxy-list.")
-                        log.error(f"[GATEWAY] Getting a new proxy... Old proxy: {self.http.proxy}")
+                        log.warning(f"[GATEWAY] Getting a new proxy... Old proxy: {self.http.proxy}")
                         self.get_new_proxy(refresh_list=True)
-                        log.error(f"[GATEWAY] ... New proxy: {self.http.proxy}")
+                        log.warning(f"[GATEWAY] ... New proxy: {self.http.proxy}")
                         client_connect_errors = 0
 
                     if client_connect_errors > 2:
@@ -709,9 +722,9 @@ class Client:
                             else:
                                 self.n_proxy_errors_on_single_proxy_dict[self.http.proxy] += 1
 
-                        log.error(f"[GATEWAY] Getting a new proxy... Old proxy: {self.http.proxy}")
+                        log.warning(f"[GATEWAY] Getting a new proxy... Old proxy: {self.http.proxy}")
                         self.get_new_proxy()
-                        log.error(f"[GATEWAY] ....New proxy: {self.http.proxy}")
+                        log.warning(f"[GATEWAY] ....New proxy: {self.http.proxy}")
                         client_connect_errors = 0
 
                 retry = backoff.delay()

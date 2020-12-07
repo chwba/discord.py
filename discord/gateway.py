@@ -694,6 +694,7 @@ class DiscordWebSocket:
         log.debug('Sending "%s" to change status', sent)
         await self.send(sent)
 
+
     async def request_sync(self, guild_ids):
         payload = {
             'op': self.GUILD_SYNC,
