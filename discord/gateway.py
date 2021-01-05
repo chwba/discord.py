@@ -366,23 +366,23 @@ class DiscordWebSocket:
     async def identify(self):
         """Sends the IDENTIFY packet."""
         # Original
-        # payload = {
-        #     'op': self.IDENTIFY,
-        #     'd': {
-        #         'token': self.token,
-        #         'properties': {
-        #             '$os': sys.platform,
-        #             '$browser': 'discord.py',
-        #             '$device': 'discord.py',
-        #             '$referrer': '',
-        #             '$referring_domain': ''
-        #         },
-        #         'compress': True,
-        #         'large_threshold': 250,
-        #         'guild_subscriptions': self._connection.guild_subscriptions,
-        #         'v': 3
-        #     }
-        # }
+        payload = {
+            'op': self.IDENTIFY,
+            'd': {
+                'token': self.token,
+                'properties': {
+                    '$os': sys.platform,
+                    '$browser': self.web_information_provider.latest_user_agent,
+                    '$device': '',
+                    '$referrer': '',
+                    '$referring_domain': ''
+                },
+                'compress': True,
+                'large_threshold': 250,
+                'guild_subscriptions': self._connection.guild_subscriptions,
+                'v': 3
+            }
+        }
         # Modified
         # payload = {
         #     'op': self.IDENTIFY,
@@ -410,41 +410,41 @@ class DiscordWebSocket:
         #     }
         # }
 
-        payload = {
-            'op': self.IDENTIFY,
-            'd': {
-                'token': self.token,
-                'capabilities': 61,
-                'properties': {
-                    '$os': 'Windows',
-                    '$browser': 'Chrome',
-                    '$device': '',
-                    '$browser_user_agent': self.web_information_provider.latest_user_agent,
-                    '$browser_version': self.web_information_provider.latest_user_agent.split('/')[3].split(' ')[0],
-                    '$os_version': '10',
-                    '$referrer': '',
-                    '$referring_domain': '',
-                    '$referrer_current': '',
-                    '$referring_domain_current': '',
-                    '$release_channel': 'stable',
-                    '$client_build_number': self.web_information_provider.client_build_number,
-                    '$client_event_source': None
-                },
-                'presence': {
-                    'status': 'online',
-                    'since': 0,
-                    'activities': [],
-                    'afk': False
-                },
-                'compress': False,
-                'client_state': {
-                    'guild_hashes': {},
-                    'highest_last_message_id': '0',
-                    'read_state_version': 0,
-                    'user_guild_settings_version': -1
-                }
-            }
-        }
+        # payload = {
+        #     'op': self.IDENTIFY,
+        #     'd': {
+        #         'token': self.token,
+        #         'capabilities': 61,
+        #         'properties': {
+        #             '$os': 'Windows',
+        #             '$browser': 'Chrome',
+        #             '$device': '',
+        #             '$browser_user_agent': self.web_information_provider.latest_user_agent,
+        #             '$browser_version': self.web_information_provider.latest_user_agent.split('/')[3].split(' ')[0],
+        #             '$os_version': '10',
+        #             '$referrer': '',
+        #             '$referring_domain': '',
+        #             '$referrer_current': '',
+        #             '$referring_domain_current': '',
+        #             '$release_channel': 'stable',
+        #             '$client_build_number': self.web_information_provider.client_build_number,
+        #             '$client_event_source': None
+        #         },
+        #         'presence': {
+        #             'status': 'online',
+        #             'since': 0,
+        #             'activities': [],
+        #             'afk': False
+        #         },
+        #         'compress': False,
+        #         'client_state': {
+        #             'guild_hashes': {},
+        #             'highest_last_message_id': '0',
+        #             'read_state_version': 0,
+        #             'user_guild_settings_version': -1
+        #         }
+        #     }
+        # }
 
         if not self._connection.is_bot:
             payload['d']['synced_guilds'] = []
