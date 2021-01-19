@@ -3,7 +3,7 @@
 """
 The MIT License (MIT)
 
-Copyright (c) 2015-2020 Rapptz
+Copyright (c) 2015-present Rapptz
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -290,12 +290,12 @@ class Member(discord.abc.Messageable, _BaseUser):
 
     def _update_inner_user(self, user):
         u = self._user
-        original = (u.name, u.avatar, u.discriminator)
+        original = (u.name, u.avatar, u.discriminator, u._public_flags)
         # These keys seem to always be available
-        modified = (user['username'], user['avatar'], user['discriminator'])
+        modified = (user['username'], user['avatar'], user['discriminator'], user.get('public_flags', 0))
         if original != modified:
             to_return = User._copy(self._user)
-            u.name, u.avatar, u.discriminator = modified
+            u.name, u.avatar, u.discriminator, u._public_flags = modified
             # Signal to dispatch on_user_update
             return to_return, u
 
@@ -643,7 +643,8 @@ class Member(discord.abc.Messageable, _BaseUser):
         Gives the member a number of :class:`Role`\s.
 
         You must have the :attr:`~Permissions.manage_roles` permission to
-        use this.
+        use this, and the added :class:`Role`\s must appear lower in the list
+        of roles than the highest role of the member.
 
         Parameters
         -----------
@@ -681,7 +682,8 @@ class Member(discord.abc.Messageable, _BaseUser):
         Removes :class:`Role`\s from this member.
 
         You must have the :attr:`~Permissions.manage_roles` permission to
-        use this.
+        use this, and the removed :class:`Role`\s must appear lower in the list
+        of roles than the highest role of the member.
 
         Parameters
         -----------

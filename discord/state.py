@@ -3,7 +3,7 @@
 """
 The MIT License (MIT)
 
-Copyright (c) 2015-2020 Rapptz
+Copyright (c) 2015-present Rapptz
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -793,6 +793,12 @@ class ConnectionState:
         else:
             if self.member_cache_flags.joined:
                 member = Member(data=data, guild=guild, state=self)
+
+                # Force an update on the inner user if necessary
+                user_update = member._update_inner_user(user)
+                if user_update:
+                    self.dispatch('user_update', user_update[0], user_update[1])
+
                 guild._add_member(member)
             log.debug('GUILD_MEMBER_UPDATE referencing an unknown member ID: %s. Discarding.', user_id)
 
