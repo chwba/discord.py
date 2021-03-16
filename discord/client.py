@@ -544,6 +544,8 @@ class Client:
             Keyword argument that specifies if the account logging on is a bot
             token or not.
 
+            .. deprecated:: 1.7
+
         Raises
         ------
         :exc:`.LoginFailure`
@@ -898,9 +900,7 @@ class Client:
 
     @allowed_mentions.setter
     def allowed_mentions(self, value):
-        if value is None:
-            self._connection.allowed_mentions = value
-        elif isinstance(value, AllowedMentions):
+        if value is None or isinstance(value, AllowedMentions):
             self._connection.allowed_mentions = value
         else:
             raise TypeError('allowed_mentions must be AllowedMentions not {0.__class__!r}'.format(value))
@@ -1371,15 +1371,13 @@ class Client:
         if icon is not None:
             icon = utils._bytes_to_base64_data(icon)
 
-        if region is None:
-            region = VoiceRegion.us_west.value
-        else:
-            region = region.value
+        region = region or VoiceRegion.us_west
+        region_value = region.value
 
         if code:
-            data = await self.http.create_from_template(code, name, region, icon)
+            data = await self.http.create_from_template(code, name, region_value, icon)
         else:
-            data = await self.http.create_guild(name, region, icon)
+            data = await self.http.create_guild(name, region_value, icon)
         return Guild(data=data, state=self._connection)
 
     # Invite management
@@ -1531,10 +1529,13 @@ class Client:
         data = await self.http.get_user(user_id)
         return User(state=self._connection, data=data)
 
+    @utils.deprecated()
     async def fetch_user_profile(self, user_id):
         """|coro|
 
         Gets an arbitrary user's profile.
+
+        .. deprecated:: 1.7
 
         .. note::
 
