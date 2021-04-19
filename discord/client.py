@@ -520,12 +520,9 @@ class Client:
                     log.error(f"[STATIC_LOGIN][{exception.__class__.__name__}] ({exception}) Attempting a reconnect in %.2fs", sleep_time)
 
                 else:
+                    log.error(f"[STATIC_LOGIN] Got an error during static login (raise) -> ({exception.__class__.__name__}) {exception}, sleeping {round(sleep_time, 2)} seconds")
+                    await asyncio.sleep(sleep_time)
                     raise exception
-
-                log.error(f"[STATIC_LOGIN] Got an error during static login, sleeping {round(sleep_time, 2)} seconds")
-                await asyncio.sleep(sleep_time)
-
-        self._connection.is_bot = bot
 
     async def logout(self):
         """|coro|
