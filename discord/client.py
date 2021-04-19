@@ -242,7 +242,7 @@ class Client:
             if self.http.proxy:
                 selected_proxy = self.http.proxy.replace("http://", "")
 
-            proxy_dict, selected_proxy = self.proxy_manager.get_random_proxy(previous_proxy=selected_proxy, from_online=True if 'online' in self.proxy_manager.proxy_type else False)
+            proxy_dict, selected_proxy = self.proxy_manager.get_random_proxy(previous_proxy=selected_proxy)
 
             if not self.proxy_manager.no_auth:
                 proxy_ip = selected_proxy.split("@")[1].split(":")[0]
